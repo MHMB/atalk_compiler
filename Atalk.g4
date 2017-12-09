@@ -41,12 +41,24 @@ grammar Atalk;
     }
 
 	void endScope() {
-        print("Stack offset: " + SymbolTable.top.getOffset(Register.SP));
-		print("Data Segment offset: " + SymbolTable.top.getOffset(Register.GP));
-		print("Heap offset: " + SymbolTable.top.getOffset(Register.TEMP9));
-		print("End Scope");
+        print(String.format("End scope:\n\tStack offset: %d\tData Segment offset: %d\tHeap offset: %d\n",
+			SymbolTable.top.getOffset(Register.SP) , 
+			SymbolTable.top.getOffset(Register.GP) , 
+			SymbolTable.top.getOffset(Register.TEMP9)));
         SymbolTable.pop();
     }
+
+	String createTemporaryName(String name , int num){
+		return name+"_Tempprary_" + num;
+	}
+
+	void endActor(){
+		print(String.format("Actor ends:\n\tStack offset: %d\tData Segment offset: %d\tHeap offset: %d\n",
+			SymbolTable.top.getOffset(Register.SP) , 
+			SymbolTable.top.getOffset(Register.GP) , 
+			SymbolTable.top.getOffset(Register.TEMP9)));
+        SymbolTable.pop();
+	}
 
 }
 
@@ -60,14 +72,31 @@ actor:
 		'actor' actor_id  = ID '<' box_len = CONST_NUM '>' NL
 		{
 			try	{
-				createActor($actor_id.text , $box_len.int);
+				if($box_len.int > 0)
+					createActor($actor_id.text , $box_len.int);
+				else{
+						print(String.format("[Line #%s] Actor \"%s\" mailbox is %d. It's an illegal value.", $actor_id.getLine(), $actor_id.text , $box_len.int));
+						createActor($actor_id.text , 0);
+					}
 			}
 			catch(ItemAlreadyExistsException e){
-				print(String.format("[Line #%s] Variable \"%s\" already exists.", $actor_id.getLine(), $actor_id.text));
+				int n = 1;
+				print(String.format("[Line #%s] Actor \"%s\" already exists.", $actor_id.getLine(), $actor_id.text));
+				while(true){
+					try{
+						createActor(createTemporaryName($actor_id.text , n) , $box_len.int);
+						break;
+					}
+					catch(ItemAlreadyExistsException ee){
+						n++;
+						continue;
+					}
+				}
 			}
 		}
 			(state | receiver | NL)*
 		'end' (NL | EOF)
+		{endActor();}
 	;
 
 state:
